@@ -24,10 +24,14 @@ func main() {
 	log.Debug("debug messages are enabled")
 
 	storage, err := sqlite.New(cfg.StoragePath)
+
 	if err != nil {
-		log.Errorf("failed to init storage: %v", err)
+		log.Error("error opening storage", err)
+		//log.Error("error opening storage", sl.Err(err))
+		os.Exit(1)
 	}
 
+	_ = storage
 	// todo : init router
 
 	// todo : run server
