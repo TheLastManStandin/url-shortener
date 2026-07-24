@@ -2,7 +2,12 @@ package sqlite
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
+	"url-shortener/internal/storage"
+
+	"github.com/mattn/go-sqlite3"
+	_ "github.com/mattn/go-sqlite3"
 )
 
 type Storage struct {
@@ -12,7 +17,7 @@ type Storage struct {
 func New(storagePath string) (*Storage, error) {
 	const op = "storage.sqlite.New"
 
-	db, err := sql.Open("sqlite", storagePath)
+	db, err := sql.Open("sqlite3", storagePath)
 	if err != nil {
 		return nil, fmt.Errorf("%s: %w", op, err)
 	}
@@ -34,4 +39,23 @@ func New(storagePath string) (*Storage, error) {
 	}
 
 	return &Storage{db: db}, nil
+}
+
+func (s *Storage) SaveURL(urlToSave string, alias string) error {
+	const op = "storage.sqlite.SaveURL"
+
+	stmt, err := s.db.Prepare("INSERT INTO url(alias, url) VALUES(?, ?)")
+	if err != nil {
+		return fmt.Errorf("%s: %w", op, err)
+	}
+
+	_, err = stmt.Exec(urlToSave, alias)
+	if err != nil {
+		var sqliteErr sqlite3.Error
+		if errors.As(err, &sqliteErr) && errors.Is(sqliteErr.ExtendedCode, sqlite3.ErrConstraintUnique) {
+			return fmt.Errorf("%s: %w", op, storage.ErrURLExists)
+		}
+	}
+
+	return nil
 }
