@@ -2,4 +2,4 @@ package storage
 
 import "errors"
 
-var ErrURLExists = errors.New("URL already exists")
+var ErrAliasExists = errors.New("alias already exists")

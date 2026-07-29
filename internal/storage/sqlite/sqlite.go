@@ -49,11 +49,11 @@ func (s *Storage) SaveURL(urlToSave string, alias string) error {
 		return fmt.Errorf("%s: %w", op, err)
 	}
 
-	_, err = stmt.Exec(urlToSave, alias)
+	_, err = stmt.Exec(alias, urlToSave)
 	if err != nil {
 		var sqliteErr sqlite3.Error
 		if errors.As(err, &sqliteErr) && errors.Is(sqliteErr.ExtendedCode, sqlite3.ErrConstraintUnique) {
-			return fmt.Errorf("%s: %w", op, storage.ErrURLExists)
+			return fmt.Errorf("%s: %w", op, storage.ErrAliasExists)
 		}
 		return fmt.Errorf("%s: %w", op, err)
 	}

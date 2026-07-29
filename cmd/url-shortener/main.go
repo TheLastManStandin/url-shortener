@@ -30,7 +30,7 @@ func main() {
 	storage, err := sqlite.New(cfg.StoragePath)
 
 	if err != nil {
-		log.Error("error opening storage", err)
+		log.Error("error opening storage", slog.Any("error", err))
 		//log.Error("error opening storage", sl.Err(err))
 		os.Exit(1)
 	}
