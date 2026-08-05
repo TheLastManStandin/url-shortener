@@ -1,4 +1,4 @@
-package slog
+package sl
 
 import "log/slog"
 

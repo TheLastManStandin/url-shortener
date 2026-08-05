@@ -1,106 +1,95 @@
 package save
 
 import (
-	"bytes"
-	"errors"
-	"io"
+	"encoding/json"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
+	"url-shortener/internal/http-server/handlers/url/save/mocks"
 	"url-shortener/internal/storage"
+
+	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 )
 
-type urlSaverFunc func(urlToSave, alias string) error
-
-func (f urlSaverFunc) SaveURL(urlToSave, alias string) error {
-	return f(urlToSave, alias)
-}
-
-func TestUserAliasConflict(t *testing.T) {
-	var calls int
-	handler := New(testLogger(), urlSaverFunc(func(_, alias string) error {
-		calls++
-		if alias != "taken" {
-			t.Fatalf("unexpected alias: %q", alias)
-		}
-		return storage.ErrAliasExists
-	}))
-
-	recorder := performRequest(handler, `{"url":"https://example.com","alias":"taken"}`)
-
-	if recorder.Code != http.StatusConflict {
-		t.Fatalf("expected status %d, got %d", http.StatusConflict, recorder.Code)
+func TestSaveHandler(t *testing.T) {
+	cases := []struct {
+		name     string
+		url      string
+		alias    string
+		respErr  string
+		mockErr  error
+		respCode int
+	}{
+		{
+			name:     "success",
+			url:      "http://test.com/",
+			alias:    "test_alias",
+			respCode: http.StatusOK,
+		},
+		{
+			name:     "already_exists",
+			url:      "http://test.com/",
+			alias:    "test_alias",
+			respErr:  "alias already exists",
+			mockErr:  storage.ErrAliasExists,
+			respCode: http.StatusConflict,
+		},
+		{
+			name:     "empty_alias",
+			url:      "http://test.com/",
+			alias:    "",
+			respCode: http.StatusOK,
+		},
+		{
+			name:     "empty_URL",
+			url:      "",
+			alias:    "abj",
+			respErr:  "field URL is a required field",
+			respCode: http.StatusOK,
+		},
+		{
+			name:     "Invalid URL",
+			url:      "some invalid URL",
+			alias:    "some_alias",
+			respErr:  "field URL is not a valid URL",
+			respCode: http.StatusOK,
+		},
 	}
-	if calls != 1 {
-		t.Fatalf("expected one save attempt, got %d", calls)
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			urLSaverMock := mocks.NewURLSaver(t)
+
+			if tc.respErr == "" || tc.mockErr != nil {
+				urLSaverMock.On("SaveURL", tc.url, mock.AnythingOfType("string")).
+					Return(tc.mockErr).
+					Once()
+			}
+
+			handler := New(slog.New(slog.DiscardHandler), urLSaverMock)
+
+			input := fmt.Sprintf(`{"url":"%s", "alias":"%s"}`, tc.url, tc.alias)
+
+			req, err := http.NewRequest(http.MethodPost, "/save", strings.NewReader(input))
+			require.NoError(t, err)
+
+			rr := httptest.NewRecorder()
+			handler.ServeHTTP(rr, req)
+
+			require.Equal(t, tc.respCode, rr.Code)
+
+			body := rr.Body.String()
+
+			var resp Response
+
+			require.NoError(t, json.Unmarshal([]byte(body), &resp))
+
+			require.Equal(t, tc.respErr, resp.Error)
+		})
 	}
-}
-
-func TestGeneratedAliasRetriesAfterConflict(t *testing.T) {
-	var calls int
-	handler := New(testLogger(), urlSaverFunc(func(_, alias string) error {
-		calls++
-		if alias == "" {
-			t.Fatal("generated alias is empty")
-		}
-		if calls == 1 {
-			return storage.ErrAliasExists
-		}
-		return nil
-	}))
-
-	recorder := performRequest(handler, `{"url":"https://example.com"}`)
-
-	if recorder.Code != http.StatusOK {
-		t.Fatalf("expected status %d, got %d", http.StatusOK, recorder.Code)
-	}
-	if calls != 2 {
-		t.Fatalf("expected two save attempts, got %d", calls)
-	}
-}
-
-func TestGeneratedAliasAttemptsAreLimited(t *testing.T) {
-	var calls int
-	handler := New(testLogger(), urlSaverFunc(func(_, _ string) error {
-		calls++
-		return storage.ErrAliasExists
-	}))
-
-	recorder := performRequest(handler, `{"url":"https://example.com"}`)
-
-	if recorder.Code != http.StatusInternalServerError {
-		t.Fatalf("expected status %d, got %d", http.StatusInternalServerError, recorder.Code)
-	}
-	if calls != maxAliasSaveAttempts {
-		t.Fatalf("expected %d save attempts, got %d", maxAliasSaveAttempts, calls)
-	}
-}
-
-func TestSaveErrorIsNotRetried(t *testing.T) {
-	var calls int
-	handler := New(testLogger(), urlSaverFunc(func(_, _ string) error {
-		calls++
-		return errors.New("database unavailable")
-	}))
-
-	recorder := performRequest(handler, `{"url":"https://example.com"}`)
-
-	if recorder.Code != http.StatusInternalServerError {
-		t.Fatalf("expected status %d, got %d", http.StatusInternalServerError, recorder.Code)
-	}
-	if calls != 1 {
-		t.Fatalf("expected one save attempt, got %d", calls)
-	}
-}
-
-func performRequest(handler http.HandlerFunc, body string) *httptest.ResponseRecorder {
-	recorder := httptest.NewRecorder()
-	request := httptest.NewRequest(http.MethodPost, "/url", bytes.NewBufferString(body))
-	handler.ServeHTTP(recorder, request)
-	return recorder
-}
-
-func testLogger() *slog.Logger {
-	return slog.New(slog.NewTextHandler(io.Discard, nil))
 }

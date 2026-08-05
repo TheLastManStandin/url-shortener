@@ -3,8 +3,10 @@ package main
 import (
 	"fmt"
 	"log/slog"
+	"net/http"
 	"os"
 	"url-shortener/internal/config"
+	"url-shortener/internal/http-server/handlers/url/save"
 	"url-shortener/internal/lib/logger/handlers/slogpretty"
 	"url-shortener/internal/storage/sqlite"
 
@@ -43,6 +45,14 @@ func main() {
 	//router.Use(mwLogger.New(log))
 	router.Use(middleware.Recoverer)
 	router.Use(middleware.URLFormat)
+
+	router.Post("/", save.New(log, storage))
+
+	err = http.ListenAndServe(":8080", router)
+	if err != nil {
+		fmt.Errorf("Err: %v", err)
+	}
+
 	// todo : run server
 }
 
