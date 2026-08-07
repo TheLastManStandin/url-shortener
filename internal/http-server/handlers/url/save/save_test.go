@@ -16,7 +16,7 @@ import (
 )
 
 func TestSaveHandler(t *testing.T) {
-	cases := []struct {
+	tests := []struct {
 		name     string
 		url      string
 		alias    string
@@ -60,20 +60,20 @@ func TestSaveHandler(t *testing.T) {
 		},
 	}
 
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			urLSaverMock := mocks.NewURLSaver(t)
 
-			if tc.respErr == "" || tc.mockErr != nil {
-				urLSaverMock.On("SaveURL", tc.url, mock.AnythingOfType("string")).
-					Return(tc.mockErr).
+			if tt.respErr == "" || tt.mockErr != nil {
+				urLSaverMock.On("SaveURL", tt.url, mock.AnythingOfType("string")).
+					Return(tt.mockErr).
 					Once()
 			}
 
 			handler := New(slog.New(slog.DiscardHandler), urLSaverMock)
 
-			input := fmt.Sprintf(`{"url":"%s", "alias":"%s"}`, tc.url, tc.alias)
+			input := fmt.Sprintf(`{"url":"%s", "alias":"%s"}`, tt.url, tt.alias)
 
 			req, err := http.NewRequest(http.MethodPost, "/save", strings.NewReader(input))
 			require.NoError(t, err)
@@ -81,7 +81,7 @@ func TestSaveHandler(t *testing.T) {
 			rr := httptest.NewRecorder()
 			handler.ServeHTTP(rr, req)
 
-			require.Equal(t, tc.respCode, rr.Code)
+			require.Equal(t, tt.respCode, rr.Code)
 
 			body := rr.Body.String()
 
@@ -89,7 +89,7 @@ func TestSaveHandler(t *testing.T) {
 
 			require.NoError(t, json.Unmarshal([]byte(body), &resp))
 
-			require.Equal(t, tc.respErr, resp.Error)
+			require.Equal(t, tt.respErr, resp.Error)
 		})
 	}
 }
