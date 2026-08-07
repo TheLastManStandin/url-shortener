@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os"
 	"url-shortener/internal/config"
+	deleteurl "url-shortener/internal/http-server/handlers/url/delete"
 	"url-shortener/internal/http-server/handlers/url/redirect"
 	"url-shortener/internal/http-server/handlers/url/save"
 	"url-shortener/internal/lib/logger/handlers/slogpretty"
@@ -49,13 +50,12 @@ func main() {
 
 	router.Post("/", save.New(log, storage))
 	router.Get("/{alias}", redirect.New(log, storage))
+	router.Delete("/{alias}", deleteurl.New(log, storage))
 
 	err = http.ListenAndServe(":8080", router)
 	if err != nil {
 		fmt.Errorf("Err: %v", err)
 	}
-
-	// todo : run server
 }
 
 func setupLogger(env string) *slog.Logger {

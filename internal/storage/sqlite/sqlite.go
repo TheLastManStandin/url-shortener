@@ -48,6 +48,7 @@ func (s *Storage) SaveURL(urlToSave string, alias string) error {
 	if err != nil {
 		return fmt.Errorf("%s: %w", op, err)
 	}
+	defer stmt.Close()
 
 	_, err = stmt.Exec(alias, urlToSave)
 	if err != nil {
@@ -68,6 +69,7 @@ func (s *Storage) GetURL(alias string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("%s: %w", op, err)
 	}
+	defer stmt.Close()
 
 	var url string
 	err = stmt.QueryRow(alias).Scan(&url)
@@ -78,4 +80,30 @@ func (s *Storage) GetURL(alias string) (string, error) {
 		return "", fmt.Errorf("%s: execute query: %w", op, err)
 	}
 	return url, nil
+}
+
+func (s *Storage) DeleteURL(alias string) error {
+	const op = "storage.sqlite.DeleteURL"
+
+	stmt, err := s.db.Prepare("DELETE FROM url WHERE alias = ?")
+	if err != nil {
+		return fmt.Errorf("%s: %w", op, err)
+	}
+	defer stmt.Close()
+
+	res, err := stmt.Exec(alias)
+	if err != nil {
+		var sqliteErr sqlite3.Error
+		if errors.As(err, &sqliteErr) && errors.Is(sqliteErr.ExtendedCode, sqlite3.ErrNotFound) {
+			return fmt.Errorf("%s: %w", op, storage.ErrAliasNotFound)
+		}
+		return fmt.Errorf("%s: %w", op, err)
+	}
+
+	if rowsAffected, err := res.RowsAffected(); err != nil {
+		return fmt.Errorf("%s: %w", op, err)
+	} else if rowsAffected == 0 {
+		return fmt.Errorf("%s: %w", op, storage.ErrAliasNotFound)
+	}
+	return nil
 }

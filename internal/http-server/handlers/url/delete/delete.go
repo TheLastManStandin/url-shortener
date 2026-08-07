@@ -1,4 +1,4 @@
-package redirect
+package delete
 
 import (
 	"errors"
@@ -13,14 +13,14 @@ import (
 	"github.com/go-chi/render"
 )
 
-//go:generate go run github.com/vektra/mockery/v2@v2.53.6 --name=URLGetter
-type URLGetter interface {
-	GetURL(string) (string, error)
+//go:generate go run github.com/vektra/mockery/v2@v2.53.6 --name=URLDeleter
+type URLDeleter interface {
+	DeleteURL(string) error
 }
 
-func New(log *slog.Logger, urlGetter URLGetter) http.HandlerFunc {
+func New(log *slog.Logger, urlDeleter URLDeleter) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		const op = "handlers.url.redirect.New"
+		const op = "handlers.url.delete.New"
 
 		log = log.With(
 			slog.String("op", op),
@@ -30,15 +30,16 @@ func New(log *slog.Logger, urlGetter URLGetter) http.HandlerFunc {
 		alias := chi.URLParam(r, "alias")
 		if alias == "" {
 			log.Info("alias is empty")
-			render.JSON(w, r, resp.Error("not found, empty alias"))
+			render.JSON(w, r, resp.Error("not found"))
 			return
 		}
 
-		resURL, err := urlGetter.GetURL(alias)
+		err := urlDeleter.DeleteURL(alias)
+
 		if err != nil {
 			if errors.Is(err, storage.ErrAliasNotFound) {
-				log.Info("alias not found", "alias", alias)
-				render.JSON(w, r, resp.Error("alias not found"))
+				log.Info("url not found", "alias", alias)
+				render.JSON(w, r, resp.Error("not found"))
 				return
 			}
 			log.Error("failed to get url", sl.Err(err))
@@ -46,8 +47,9 @@ func New(log *slog.Logger, urlGetter URLGetter) http.HandlerFunc {
 			return
 		}
 
-		log.Info("got url", slog.String("url", resURL))
-
-		http.Redirect(w, r, resURL, http.StatusFound)
+		log.Info("url deleted", "alias", alias)
+		render.Status(r, http.StatusOK)
+		render.JSON(w, r, resp.Ok())
+		return
 	}
 }
