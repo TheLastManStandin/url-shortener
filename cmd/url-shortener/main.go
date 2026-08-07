@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os"
 	"url-shortener/internal/config"
+	"url-shortener/internal/http-server/handlers/url/redirect"
 	"url-shortener/internal/http-server/handlers/url/save"
 	"url-shortener/internal/lib/logger/handlers/slogpretty"
 	"url-shortener/internal/storage/sqlite"
@@ -47,6 +48,7 @@ func main() {
 	router.Use(middleware.URLFormat)
 
 	router.Post("/", save.New(log, storage))
+	router.Get("/{alias}", redirect.New(log, storage))
 
 	err = http.ListenAndServe(":8080", router)
 	if err != nil {
