@@ -48,9 +48,16 @@ func main() {
 	router.Use(middleware.Recoverer)
 	router.Use(middleware.URLFormat)
 
-	router.Post("/", save.New(log, storage))
+	router.Route("/url", func(r chi.Router) {
+		r.Use(middleware.BasicAuth("url-shortener", map[string]string{
+			cfg.HTTPServer.User: cfg.HTTPServer.Password,
+		}))
+
+		router.Post("/", save.New(log, storage))
+		router.Delete("/{alias}", deleteurl.New(log, storage))
+	})
+
 	router.Get("/{alias}", redirect.New(log, storage))
-	router.Delete("/{alias}", deleteurl.New(log, storage))
 
 	err = http.ListenAndServe(":8080", router)
 	if err != nil {
