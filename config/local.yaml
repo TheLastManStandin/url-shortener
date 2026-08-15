@@ -1,6 +1,0 @@
-env : "local" # local, dev, prod
-storage_path: "./storage/storage.db"
-http_server:
-  adress: "localhst:8080"
-  timeout: 4
-  idle_timeout: 60
