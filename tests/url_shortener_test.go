@@ -18,15 +18,24 @@ func TestURLShortener_HappyPath(t *testing.T) {
 	}
 
 	e := httpexpect.Default(t, u.String())
+	alias := random.NewRandomAlias(10)
 
 	e.POST("/url").
 		WithJSON(save.Request{
 			URL:   gofakeit.URL(),
-			Alias: random.NewRandomAlias(10),
+			Alias: alias,
 		}).
 		WithBasicAuth("user", "user").
 		Expect().
 		Status(http.StatusOK).
 		JSON().Object().
-		ContainsKey("alias")
+		ContainsKey("alias").
+		Values().
+		Value(0).
+		IsEqual(alias)
+
+	e.DELETE("/url/"+alias).
+		WithBasicAuth("user", "user").
+		Expect().
+		Status(http.StatusOK)
 }
