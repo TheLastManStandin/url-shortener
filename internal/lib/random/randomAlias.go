@@ -9,8 +9,11 @@ import (
 func NewRandomAlias(randAliasLength int) string {
 	rnd := rand.New(rand.NewSource(time.Now().UnixNano()))
 	ret := strings.Builder{}
+
+	symbols := "AaBbCcDdEeFfGgHhIiJjKkLlMmNnOoPpQqRrSsTtUuVvWwXxYyZz0123456789"
+
 	for i := 0; i < randAliasLength; i++ {
-		ret.WriteByte(byte(rnd.Intn(90-48) + 48)) // 90 символ ascii это большая Z
+		ret.WriteByte(symbols[rnd.Intn(len(symbols))])
 	}
 	return ret.String()
 }
